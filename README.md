@@ -1,1 +1,0 @@
-# TUM - Our Big Python | Mobile Computer Vision
