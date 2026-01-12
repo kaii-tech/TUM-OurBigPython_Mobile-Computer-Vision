@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -205,3 +205,35 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Machine Learning / TensorFlow specific
+*.h5
+*.hdf5
+*.keras
+*.tflite
+*.pb
+*.ckpt
+*.ckpt.data-*
+*.ckpt.index
+*.ckpt.meta
+saved_model/
+checkpoints/
+tensorboard_logs/
+
+# Training outputs
+*.npy
+*.npz
+*.pkl
+*.pickle
+
+# Large datasets
+archive/
+*.tar.gz
+*.parquet
+
+# WSL virtual environment
+.venv_wsl/
+
+# OS
+Thumbs.db
+desktop.ini
