@@ -36,11 +36,14 @@ else:
     print("No GPU detected. Running on CPU.")
 
 # Hyperparameters
-INIT_LR = 1e-3
-N_EPOCH = 10
-BATCH_SIZE = 32
+INIT_LR = 2e-3  # Increased for batch size 64
+FINE_TUNE_LR = 1e-4  # Lower LR for fine-tuning
+N_EPOCH_HEAD = 30  # Epochs for training head only
+N_EPOCH_FINETUNE = 50  # Epochs for fine-tuning
+BATCH_SIZE = 64  # Increased from 32 for faster convergence
 IMG_SIZE = 224  # Image size for room classification
 NUM_CLASSES = 27  # 27 rooms in the dataset
+FINE_TUNE_LAYERS = 100  # Number of layers to unfreeze for fine-tuning
 
 # Set random seeds
 tf.random.set_seed(251211)
@@ -134,62 +137,59 @@ def load_and_preprocess_data():
     return (x_train, y_train), (x_test, y_test), label_to_room
 
 
-def create_cnn_model():
-    """Create a CNN model for room classification (27 classes)."""
+def create_mobilenet_model():
+    """Create a MobileNetV2 transfer learning model for room classification."""
     input_shape = (IMG_SIZE, IMG_SIZE, 3)
-
+    
+    # Data augmentation layer
     data_augmentation = tf.keras.Sequential([
         layers.RandomFlip("horizontal"),
         layers.RandomRotation(0.1),
         layers.RandomZoom(0.1),
-    ])
+    ], name='data_augmentation')
+    
+    # Load MobileNetV2 pretrained on ImageNet
+    base_model = tf.keras.applications.MobileNetV2(
+        input_shape=input_shape,
+        include_top=False,
+        weights='imagenet'
+    )
+    
+    # Freeze base model initially
+    base_model.trainable = False
+    
+    # Build the model
+    inputs = tf.keras.Input(shape=input_shape)
+    x = data_augmentation(inputs)
+    
+    # Preprocess input for MobileNetV2 (scales to [-1, 1])
+    x = tf.keras.applications.mobilenet_v2.preprocess_input(x * 255.0)
+    
+    # Base model
+    x = base_model(x, training=False)
+    
+    # Classification head
+    x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(256, activation='relu')(x)
+    x = layers.Dropout(0.4)(x)
+    outputs = layers.Dense(NUM_CLASSES, activation='softmax')(x)
+    
+    model = tf.keras.Model(inputs, outputs)
+    
+    return model, base_model
 
-    model = models.Sequential([
-        tf.keras.Input(shape=input_shape),
-        data_augmentation,
 
-        # First Convolutional Block
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-
-        # Second Convolutional Block
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-
-        # Third Convolutional Block
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-
-        # Fourth Convolutional Block
-        layers.Conv2D(256, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.Conv2D(256, (3, 3), activation='relu', padding='same'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-
-        # Fully Connected Layers
-        layers.Flatten(),
-        layers.Dense(512, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.5),
-        layers.Dense(256, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.5),
-        layers.Dense(NUM_CLASSES, activation='softmax')
-    ])
+def unfreeze_model(model, base_model, num_layers_to_unfreeze=FINE_TUNE_LAYERS):
+    """Unfreeze the top layers of the base model for fine-tuning."""
+    base_model.trainable = True
+    
+    # Freeze all layers except the last num_layers_to_unfreeze
+    for layer in base_model.layers[:-num_layers_to_unfreeze]:
+        layer.trainable = False
+    
+    trainable_count = sum([1 for layer in base_model.layers if layer.trainable])
+    print(f"Unfroze {trainable_count} layers for fine-tuning")
+    
     return model
 
 
@@ -221,11 +221,17 @@ def main():
     
     print(f"\nLabel mapping: {label_to_room}")
     
-    # Create model
+    # Create model with MobileNetV2 base
     print("\n" + "-" * 50)
-    print("Creating Model...")
+    print("Creating MobileNetV2 Model...")
     print("-" * 50)
-    model = create_cnn_model()
+    model, base_model = create_mobilenet_model()
+    
+    # ========== STAGE 1: Train classification head only ==========
+    print("\n" + "=" * 60)
+    print("STAGE 1: Training Classification Head (Base Model Frozen)")
+    print("=" * 60)
+    
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=INIT_LR),
         loss='sparse_categorical_crossentropy',
@@ -233,43 +239,85 @@ def main():
     )
     model.summary()
     
-    # Callbacks
-    callbacks = [
+    # Callbacks for Stage 1
+    callbacks_stage1 = [
         tf.keras.callbacks.EarlyStopping(
             monitor='val_accuracy',
-            patience=5,
+            patience=10,
             restore_best_weights=True
         ),
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
             factor=0.5,
-            patience=3,
+            patience=5,
             min_lr=1e-6
         )
     ]
     
-    # Train
-    print("\n" + "-" * 50)
-    print("Starting Training...")
-    print(f"Epochs: {N_EPOCH}, Batch size: {BATCH_SIZE}")
-    print("-" * 50)
+    print(f"\nStage 1: {N_EPOCH_HEAD} epochs, Batch size: {BATCH_SIZE}, LR: {INIT_LR}")
     
-    history = model.fit(
+    history1 = model.fit(
         x_train, y_train,
-        epochs=N_EPOCH,
+        epochs=N_EPOCH_HEAD,
         batch_size=BATCH_SIZE,
         validation_data=(x_test, y_test),
-        callbacks=callbacks,
+        callbacks=callbacks_stage1,
         verbose=1
     )
     
-    # Evaluate
-    print("\n" + "-" * 50)
-    print("Evaluating Model...")
-    print("-" * 50)
+    # Evaluate after Stage 1
+    stage1_loss, stage1_acc = model.evaluate(x_test, y_test, verbose=0)
+    print(f"\nStage 1 Results - Loss: {stage1_loss:.4f}, Accuracy: {stage1_acc:.4f} ({stage1_acc*100:.2f}%)")
+    
+    # ========== STAGE 2: Fine-tune top layers of base model ==========
+    print("\n" + "=" * 60)
+    print(f"STAGE 2: Fine-tuning (Unfreezing top {FINE_TUNE_LAYERS} layers)")
+    print("=" * 60)
+    
+    # Unfreeze top layers
+    model = unfreeze_model(model, base_model, FINE_TUNE_LAYERS)
+    
+    # Recompile with lower learning rate
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=FINE_TUNE_LR),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    
+    # Callbacks for Stage 2 (more patience for fine-tuning)
+    callbacks_stage2 = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_accuracy',
+            patience=15,
+            restore_best_weights=True
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-7
+        )
+    ]
+    
+    print(f"\nStage 2: {N_EPOCH_FINETUNE} epochs, Batch size: {BATCH_SIZE}, LR: {FINE_TUNE_LR}")
+    
+    history2 = model.fit(
+        x_train, y_train,
+        epochs=N_EPOCH_FINETUNE,
+        batch_size=BATCH_SIZE,
+        validation_data=(x_test, y_test),
+        callbacks=callbacks_stage2,
+        verbose=1
+    )
+    
+    # ========== FINAL EVALUATION ==========
+    print("\n" + "=" * 60)
+    print("FINAL EVALUATION")
+    print("=" * 60)
     test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=0)
-    print(f"Test Loss: {test_loss:.4f}")
-    print(f"Test Accuracy: {test_accuracy:.4f} ({test_accuracy*100:.2f}%)")
+    print(f"Final Test Loss: {test_loss:.4f}")
+    print(f"Final Test Accuracy: {test_accuracy:.4f} ({test_accuracy*100:.2f}%)")
+    print(f"\nImprovement from Stage 1: {(test_accuracy - stage1_acc)*100:.2f}%")
     
     # Save model
     model_path = script_dir / 'room_model.keras'
