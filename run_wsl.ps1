@@ -2,7 +2,7 @@
 # Usage: .\run_wsl.ps1 "path/to/script.py"
 
 param(
-    [string]$ScriptPath = "Labcourse AI/Mushroom 224x224.py"
+    [string]$ScriptPath = "tflite_room_training.py"
 )
 
 Write-Host "Running in WSL with GPU support..." -ForegroundColor Green

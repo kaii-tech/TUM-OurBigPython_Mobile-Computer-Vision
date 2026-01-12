@@ -219,17 +219,67 @@ __marimo__/
 saved_model/
 checkpoints/
 tensorboard_logs/
+logs/
+pruning_logs/
 
-# Training outputs
+# Training outputs and cached data
 *.npy
 *.npz
 *.pkl
 *.pickle
+test_data.npz
+label_mapping.npy
+room_label_mapping.npy
 
-# Large datasets
-archive/
+# Model files
+*_model.keras
+*_model.tflite
+*_model_*.tflite
+room_model*
+room_pruned*
+room_quantized*
+
+# TFLite inference
+tflite_inference_*.json
+
+# Global image assets (ignore images anywhere)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.JPG
+*.JPEG
+*.PNG
+*.GIF
+*.BMP
+*.TIF
+*.TIFF
+
+# Large datasets (anchored to repo root)
+# Ignore dataset folders and all images within them
+/archive/
+/archive/**/*.jpg
+/archive/**/*.jpeg
+/archive/**/*.png
+/Dataset/
+/Dataset/**/*.jpg
+/Dataset/**/*.jpeg
+/Dataset/**/*.png
+/Lab_Course_Dataset/
+/Lab_Course_Dataset/**/*.jpg
+/Lab_Course_Dataset/**/*.jpeg
+/Lab_Course_Dataset/**/*.png
+/
+Lab_Course_Dataset_Processed/
+Lab_Course_Dataset_Processed/**/*.jpg
+Lab_Course_Dataset_Processed/**/*.jpeg
+Lab_Course_Dataset_Processed/**/*.png
 *.tar.gz
 *.parquet
+*.zip
 
 # WSL virtual environment
 .venv_wsl/
@@ -237,3 +287,4 @@ archive/
 # OS
 Thumbs.db
 desktop.ini
+.DS_Store
