@@ -93,6 +93,7 @@ def ssh_command(worker: Dict[str, Any], remote_cmd: str) -> subprocess.Completed
 
 def prep_worker(worker: Dict[str, Any]) -> None:
     print(f"\n=== Preparing {worker['host']} ===")
+    tf_port = worker.get("tf_port", DEFAULT_TF_PORT)
     remote_script = f"""
 set -e
 export PATH="$HOME/miniconda3/bin:$HOME/anaconda3/bin:$PATH"
