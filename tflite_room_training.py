@@ -233,7 +233,7 @@ def main():
     print("=" * 60)
     
     model.compile(
-        optimizer=tf.keras.optimizers.legacy.Adam(learning_rate=INIT_LR),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=INIT_LR),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -279,7 +279,7 @@ def main():
     
     # Recompile with lower learning rate
     model.compile(
-        optimizer=tf.keras.optimizers.legacy.Adam(learning_rate=FINE_TUNE_LR),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=FINE_TUNE_LR),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )

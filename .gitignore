@@ -229,8 +229,21 @@ tensorboard_logs/
 
 # Large datasets
 archive/
+CitiesDataset/
 *.tar.gz
 *.parquet
+*.csv
+*.jpg
+*.png
+*.jpeg
+*.bmp
+*.tiff
+*.gif
+*.mp4
+*.avi
+*.mkv
+*.wav
+*.mp3
 
 # WSL virtual environment
 .venv_wsl/
@@ -240,3 +253,4 @@ Thumbs.db
 desktop.ini
 .DS_Store
 .Trashes
+
