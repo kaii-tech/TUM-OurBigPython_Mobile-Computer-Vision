@@ -11,8 +11,14 @@ Prepare all workers:
 import os
 import subprocess
 import json
+import shutil
 from pathlib import Path
 from typing import List, Dict, Any
+
+try:
+    import paramiko  # optional fallback if sshpass is unavailable
+except ImportError:  # pragma: no cover
+    paramiko = None
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -65,6 +71,7 @@ def build_workers() -> List[Dict[str, Any]]:
     password = secrets.get("password")
     ssh_port = int(secrets.get("ssh_port", secrets.get("port", DEFAULT_SSH_PORT)))
     tf_port = int(secrets.get("tf_port", DEFAULT_TF_PORT))
+    identity_file = secrets.get("identity_file")
     ips = WORKER_IPS[:MAX_WORKERS]
     workers = []
     for ip in ips:
@@ -73,18 +80,72 @@ def build_workers() -> List[Dict[str, Any]]:
             "ssh_port": ssh_port,
             "tf_port": tf_port,
             "password": password,
+            "identity_file": identity_file,
         })
     return workers
 
 
 def ssh_command(worker: Dict[str, Any], remote_cmd: str) -> subprocess.CompletedProcess:
-    cmd = ["ssh", *SSH_OPTS]
-    if worker.get("ssh_port") and worker["ssh_port"] != 22:
-        cmd += ["-p", str(worker["ssh_port"])]
-    cmd += [worker["host"], "bash", "-lc", remote_cmd]
-    if worker.get("password"):
-        cmd = ["sshpass", "-p", worker["password"]] + cmd
-    return subprocess.run(cmd, text=True, capture_output=True)
+    password = worker.get("password") or None
+    # Prefer key-based SSH first
+    identity_file = worker.get("identity_file")
+
+    if password is None:
+        cmd = ["ssh", *SSH_OPTS]
+        if worker.get("ssh_port") and worker["ssh_port"] != 22:
+            cmd += ["-p", str(worker["ssh_port"])]
+        if identity_file:
+            cmd += ["-i", identity_file]
+        cmd += [worker["host"], "bash", "-lc", remote_cmd]
+        return subprocess.run(cmd, text=True, capture_output=True)
+
+    # If password explicitly provided, try sshpass → paramiko
+    if shutil.which("sshpass"):
+        print(f"Using sshpass for {worker['host']}")
+        cmd = ["ssh", *SSH_OPTS]
+        if worker.get("ssh_port") and worker["ssh_port"] != 22:
+            cmd += ["-p", str(worker["ssh_port"])]
+        if identity_file:
+            cmd += ["-i", identity_file]
+        cmd += [worker["host"], "bash", "-lc", remote_cmd]
+        cmd = ["sshpass", "-p", password] + cmd
+        return subprocess.run(cmd, text=True, capture_output=True)
+    if paramiko is not None:
+        print(f"Using paramiko for {worker['host']}")
+        return _paramiko_exec(worker, remote_cmd)
+    return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="Password provided but sshpass/paramiko not available")
+
+
+def _paramiko_exec(worker: Dict[str, Any], remote_cmd: str) -> subprocess.CompletedProcess:
+    """Fallback execution using paramiko when sshpass is unavailable."""
+    stdout = []
+    stderr = []
+    rc = 0
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(
+            hostname=worker["host"].split("@")[-1],
+            username=worker["host"].split("@")[0],
+            password=worker.get("password"),
+            port=worker.get("ssh_port", 22),
+            look_for_keys=False,
+            allow_agent=False,
+            timeout=10,
+        )
+        _, stdout_chan, stderr_chan = client.exec_command(f"bash -lc '{remote_cmd}'", get_pty=True)
+        stdout = stdout_chan.read().decode()
+        stderr = stderr_chan.read().decode()
+        rc = stdout_chan.channel.recv_exit_status()
+    except Exception as exc:  # pragma: no cover
+        rc = 1
+        stderr = str(exc)
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+    return subprocess.CompletedProcess(args=[], returncode=rc, stdout=stdout, stderr=stderr)
 
 
 # ---------------------------------------------------------------------------

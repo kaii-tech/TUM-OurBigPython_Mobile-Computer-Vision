@@ -11,6 +11,7 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras import mixed_precision
 
 try:
     import kagglehub  # Optional: only used when --data-dir is not provided
@@ -20,10 +21,12 @@ except ImportError:  # pragma: no cover
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-DEFAULT_IMG_SIZE = 224
-DEFAULT_BATCH_SIZE = 128
-DEFAULT_EPOCHS = 6
-BASE_LR = 3e-4
+DEFAULT_IMG_SIZE = 380
+DEFAULT_BATCH_SIZE = 32
+DEFAULT_EPOCHS = 20  # stage 1 epochs
+DEFAULT_FINE_TUNE_EPOCHS = 10
+BASE_LR_STAGE1 = 1e-3
+BASE_LR_STAGE2 = 1e-5
 VALIDATION_SPLIT = 0.2
 SEED = 42
 
@@ -86,33 +89,13 @@ def load_datasets(data_root: Path, img_size: int, batch_size: int):
     return train_ds, val_ds, num_classes
 
 
-def build_model(num_classes: int, img_size: int, model_name: str):
-    """Create MobileNetV2/EfficientNet/ResNet backbone with augmentation."""
-    model_name = model_name.lower()
-    if model_name == "mobilenetv2":
-        base = keras.applications.MobileNetV2(
-            include_top=False,
-            weights="imagenet",
-            input_shape=(img_size, img_size, 3),
-            alpha=1.0,
-        )
-        preprocess = keras.applications.mobilenet_v2.preprocess_input
-    elif model_name == "efficientnetb0":
-        base = keras.applications.EfficientNetB0(
-            include_top=False,
-            weights="imagenet",
-            input_shape=(img_size, img_size, 3),
-        )
-        preprocess = keras.applications.efficientnet.preprocess_input
-    elif model_name == "resnet50":
-        base = keras.applications.ResNet50(
-            include_top=False,
-            weights="imagenet",
-            input_shape=(img_size, img_size, 3),
-        )
-        preprocess = keras.applications.resnet50.preprocess_input
-    else:
-        raise ValueError(f"Unsupported model: {model_name}")
+def build_model(num_classes: int, img_size: int):
+    """EfficientNetB4 backbone with the same head as City_Locator-BIG.ipynb."""
+    base = keras.applications.EfficientNetB4(
+        include_top=False,
+        weights="imagenet",
+        input_shape=(img_size, img_size, 3),
+    )
 
     base.trainable = False
 
@@ -130,15 +113,17 @@ def build_model(num_classes: int, img_size: int, model_name: str):
 
     inputs = keras.Input(shape=(img_size, img_size, 3))
     x = data_augmentation(inputs)
-    x = preprocess(x)
+    x = keras.applications.efficientnet.preprocess_input(x)
     x = base(x, training=False)
     x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
-    x = layers.Dropout(0.2)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dense(512, activation="relu", kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+    x = layers.Dropout(0.4)(x)
     x = layers.Dense(256, activation="relu", kernel_regularizer=keras.regularizers.l2(1e-4))(x)
-    x = layers.Dropout(0.2)(x)
+    x = layers.Dropout(0.3)(x)
     outputs = layers.Dense(num_classes, activation="softmax", dtype="float32", name="predictions")(x)
 
-    model = keras.Model(inputs, outputs, name=f"{model_name}_city_locator")
+    model = keras.Model(inputs, outputs, name="efficientnetB4_city_locator")
     return model, base
 
 
@@ -173,10 +158,10 @@ def main():
     parser = argparse.ArgumentParser(description="Distributed City Locator training")
     parser.add_argument("--data-dir", type=str, default=None, help="Root directory containing class subfolders; if omitted and kagglehub is available, downloads gsv-cities")
     parser.add_argument("--output-dir", type=str, default="./results", help="Where to save checkpoints and history")
-    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS)
+    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help="Stage 1 (frozen backbone) epochs")
+    parser.add_argument("--fine-tune-epochs", type=int, default=DEFAULT_FINE_TUNE_EPOCHS, help="Stage 2 fine-tuning epochs")
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Per-worker batch size")
     parser.add_argument("--img-size", type=int, default=DEFAULT_IMG_SIZE)
-    parser.add_argument("--model", type=str, default="mobilenetv2", choices=["mobilenetv2", "efficientnetb0", "resnet50"])
     args = parser.parse_args()
 
     # Resolve data directory (download if needed)
@@ -192,18 +177,24 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Strategy setup
+    # Match notebook: enable mixed precision for speed/memory
+    mixed_precision.set_global_policy("mixed_float16")
+
     strategy = tf.distribute.MultiWorkerMirroredStrategy()
     num_workers = strategy.num_replicas_in_sync
-    lr = BASE_LR * max(1, num_workers)
+    lr_stage1 = BASE_LR_STAGE1  # keep unscaled to mirror notebook
+    lr_stage2 = BASE_LR_STAGE2
 
     print("=" * 70)
     print("City Locator Distributed Training")
     print("=" * 70)
     print(f"Workers in sync: {num_workers}")
-    print(f"Learning rate (scaled): {lr}")
+    print(f"Stage1 LR: {lr_stage1}")
+    print(f"Stage2 LR: {lr_stage2}")
     print(f"Batch size per worker: {args.batch_size}")
-    print(f"Epochs: {args.epochs}")
-    print(f"Model: {args.model}")
+    print(f"Stage1 epochs: {args.epochs}")
+    print(f"Stage2 epochs: {args.fine_tune_epochs}")
+    print(f"Model: EfficientNetB4")
     print(f"Data root: {data_root}")
     print(f"Output dir: {output_dir}")
     print("=" * 70)
@@ -215,20 +206,21 @@ def main():
     chief = is_chief(resolver)
 
     with strategy.scope():
-        model, base = build_model(num_classes, args.img_size, args.model)
-        optimizer = keras.optimizers.Adam(learning_rate=lr)
+        model, base = build_model(num_classes, args.img_size)
         loss = keras.losses.CategoricalCrossentropy(label_smoothing=0.05)
+        optimizer_stage1 = keras.optimizers.Adam(learning_rate=lr_stage1)
         model.compile(
-            optimizer=optimizer,
+            optimizer=optimizer_stage1,
             loss=loss,
-            metrics=["accuracy", keras.metrics.TopKCategoricalAccuracy(k=5, name="top_5_acc")],
+            metrics=["accuracy", keras.metrics.TopKCategoricalAccuracy(k=3, name="top_3_acc")],
         )
 
     # Callbacks (checkpoint only on chief to avoid contention)
-    callbacks = []
+    # Stage 1: frozen backbone
+    callbacks_stage1 = [keras.callbacks.BackupAndRestore(backup_dir=str(output_dir / "backup_stage1"))]
     if chief:
-        ckpt_path = output_dir / f"{args.model}_best.keras"
-        callbacks.append(
+        ckpt_path = output_dir / "efficientnetb4_stage1_best.keras"
+        callbacks_stage1.append(
             keras.callbacks.ModelCheckpoint(
                 filepath=str(ckpt_path),
                 monitor="val_accuracy",
@@ -237,41 +229,66 @@ def main():
                 verbose=1,
             )
         )
-    callbacks.append(
+
+    history_stage1 = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=args.epochs,
+        callbacks=callbacks_stage1,
+        verbose=1,
+    )
+
+    # Stage 2: unfreeze top ~25% (keep BatchNorm frozen)
+    fine_tune_at = len(base.layers) * 3 // 4
+    for i, layer in enumerate(base.layers):
+        layer.trainable = i >= fine_tune_at
+        if isinstance(layer, layers.BatchNormalization):
+            layer.trainable = False
+
+    with strategy.scope():
+        optimizer_stage2 = keras.optimizers.Adam(learning_rate=lr_stage2)
+        model.compile(
+            optimizer=optimizer_stage2,
+            loss=loss,
+            metrics=["accuracy", keras.metrics.TopKCategoricalAccuracy(k=3, name="top_3_acc")],
+        )
+
+    callbacks_stage2 = [
         keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
             patience=3,
             restore_best_weights=True,
             verbose=1,
+        ),
+        keras.callbacks.BackupAndRestore(backup_dir=str(output_dir / "backup_stage2")),
+    ]
+    if chief:
+        ckpt_path_ft = output_dir / "efficientnetb4_stage2_best.keras"
+        callbacks_stage2.append(
+            keras.callbacks.ModelCheckpoint(
+                filepath=str(ckpt_path_ft),
+                monitor="val_accuracy",
+                save_best_only=True,
+                mode="max",
+                verbose=1,
+            )
         )
-    )
-    callbacks.append(
-        keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss",
-            factor=0.5,
-            patience=2,
-            min_lr=1e-6,
-            verbose=1,
-        )
-    )
-    callbacks.append(
-        keras.callbacks.BackupAndRestore(backup_dir=str(output_dir / "backup"))
-    )
 
-    history = model.fit(
+    history_stage2 = model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=args.epochs,
-        callbacks=callbacks,
+        epochs=args.fine_tune_epochs,
+        callbacks=callbacks_stage2,
         verbose=1,
     )
 
     if chief:
-        final_path = output_dir / f"{args.model}_final.keras"
+        final_path = output_dir / "efficientnetb4_final.keras"
         model.save(final_path)
         print(f"Final model saved to {final_path}")
-        save_history(history, output_dir, prefix=args.model)
-        convert_to_tflite(model, output_dir, prefix=args.model)
+        save_history(history_stage1, output_dir, prefix="efficientnetb4_stage1")
+        save_history(history_stage2, output_dir, prefix="efficientnetb4_stage2")
+        convert_to_tflite(model, output_dir, prefix="efficientnetb4")
 
     print("Training complete")
 

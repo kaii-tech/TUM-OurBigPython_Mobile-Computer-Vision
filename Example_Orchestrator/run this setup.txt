@@ -1,0 +1,4 @@
+
+# Run the bellow line in the terminal be cd into Example_Orchestrator
+
+for h in 10.157.144.9 10.157.144.12 10.157.144.14 10.157.144.19 10.157.144.24 10.157.144.27 10.157.144.32 10.157.144.34; do echo "=== $h: copy setup_tf_worker.sh ==="; scp setup_tf_worker.sh go56pic@$h:~/setup_tf_worker.sh || { echo "copy failed"; break; }; echo "=== $h: run setup_tf_worker.sh ==="; ssh go56pic@$h "bash ~/setup_tf_worker.sh" || { echo "run failed"; break; }; done
