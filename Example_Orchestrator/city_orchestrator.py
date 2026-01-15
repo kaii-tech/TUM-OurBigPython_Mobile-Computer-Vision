@@ -88,7 +88,7 @@ def build_workers() -> List[Dict[str, Any]]:
 
 def build_tf_config(workers: List[Dict[str, Any]]) -> List[str]:
     """Return TF_CONFIG strings aligned to workers list."""
-    cluster_workers = [f"{w['host'].split('@')[-1]}:{w['port']}" for w in workers]
+    cluster_workers = [f"{w['host'].split('@')[-1]}:{w['tf_port']}" for w in workers]
     tf_configs = []
     for idx, _ in enumerate(workers):
         tfc = {
@@ -116,7 +116,10 @@ def launch_worker(worker: Dict[str, Any], tf_config: str, log_path: Path):
 
     log_file = log_path.open("w")
 
-    ssh_cmd = ["ssh", *SSH_OPTS, worker["host"], "bash", "-lc", remote_cmd]
+    ssh_cmd = ["ssh", *SSH_OPTS]
+    if worker.get("ssh_port") and worker["ssh_port"] != 22:
+        ssh_cmd += ["-p", str(worker["ssh_port"])]
+    ssh_cmd += [worker["host"], "bash", "-lc", remote_cmd]
     if worker.get("password"):
         ssh_cmd = ["sshpass", "-p", worker["password"]] + ssh_cmd
 
@@ -157,7 +160,10 @@ def fetch_from_chief(chief_worker: Dict[str, Any]):
     ]
     for remote_file in files:
         local_path = LOCAL_RESULTS_DIR / Path(remote_file).name
-        scp_cmd = ["scp", *SSH_OPTS, f"{chief_worker['host']}:{remote_file}", str(local_path)]
+        scp_cmd = ["scp", *SSH_OPTS]
+        if chief_worker.get("ssh_port") and chief_worker["ssh_port"] != 22:
+            scp_cmd += ["-P", str(chief_worker["ssh_port"])]
+        scp_cmd += [f"{chief_worker['host']}:{remote_file}", str(local_path)]
         if chief_worker.get("password"):
             scp_cmd = ["sshpass", "-p", chief_worker["password"]] + scp_cmd
         try:
