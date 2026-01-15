@@ -1,0 +1,13 @@
+# Core Machine Learning Frameworks
+tensorflow>=2.15.0
+numpy>=1.24.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# Data Science and Utilities
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+
+# Kaggle Dataset Downloads
+kagglehub>=0.2.0
