@@ -11,5 +11,5 @@ os.chdir(web_dir)
 handler = SimpleHTTPRequestHandler
 
 with TCPServer(("", PORT), handler) as httpd:
-    print(f"Server running at http://localhost:{PORT}/home")
+    print(f"Server running at http://localhost:{PORT}/")
     httpd.serve_forever()
