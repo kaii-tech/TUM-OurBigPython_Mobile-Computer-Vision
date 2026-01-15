@@ -57,26 +57,61 @@ initialize_conda() {
         fi
     done
     
-    # If still not found, show error and instructions
-    print_error "Conda not found!"
+    # If still not found, install Miniconda
+    print_warning "Conda not found. Installing Miniconda..."
     echo ""
-    echo "Please install Miniconda or Anaconda first:"
+    
+    MINICONDA_INSTALLER="Miniconda3-latest-Linux-x86_64.sh"
+    MINICONDA_URL="https://repo.anaconda.com/miniconda/${MINICONDA_INSTALLER}"
+    INSTALL_PATH="$HOME/miniconda3"
+    
+    # Download Miniconda installer
+    print_status "Downloading Miniconda installer..."
+    if ! wget -q --show-progress "${MINICONDA_URL}" -O "/tmp/${MINICONDA_INSTALLER}"; then
+        print_error "Failed to download Miniconda installer!"
+        echo "Please install manually from: https://docs.conda.io/en/latest/miniconda.html"
+        exit 1
+    fi
+    
+    # Install Miniconda
+    print_status "Installing Miniconda to ${INSTALL_PATH}..."
+    if ! bash "/tmp/${MINICONDA_INSTALLER}" -b -p "${INSTALL_PATH}"; then
+        print_error "Miniconda installation failed!"
+        rm -f "/tmp/${MINICONDA_INSTALLER}"
+        exit 1
+    fi
+    
+    # Clean up installer
+    rm -f "/tmp/${MINICONDA_INSTALLER}"
+    print_status "Miniconda installed successfully!"
+    
+    # Initialize conda for bash
+    print_status "Initializing conda..."
+    "${INSTALL_PATH}/bin/conda" init bash
+    
+    print_status "Miniconda installed successfully!"
+    print_status "Restarting script in new bash session with conda available..."
     echo ""
-    echo "To install Miniconda:"
-    echo "  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    echo "  bash Miniconda3-latest-Linux-x86_64.sh"
-    echo ""
-    echo "Or follow instructions at: https://docs.conda.io/en/latest/miniconda.html"
-    echo ""
-    echo "After installation, restart your terminal or run:"
-    echo "  source ~/miniconda3/etc/profile.d/conda.sh"
-    echo ""
-    exit 1
+    
+    # Restart the script in a new bash session with conda initialized
+    exec bash "$0" "$@"
 }
 
 # Initialize conda first
 print_status "Checking for conda installation..."
 initialize_conda
+
+# Accept Conda Terms of Service
+echo ""
+echo "=========================================="
+echo "Accepting Conda Terms of Service"
+echo "=========================================="
+print_status "Accepting Conda TOS..."
+# Accept TOS for default channels
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main 2>/dev/null || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r 2>/dev/null || true
+conda tos accept --override-channels --channel defaults 2>/dev/null || true
+print_status "Conda TOS accepted!"
 
 # 1. Update Conda
 echo ""
@@ -263,13 +298,18 @@ echo "Setup Complete!"
 echo "=========================================="
 print_status "Conda environment '${ENV_NAME}' is ready!"
 echo ""
-echo "To activate the environment, run:"
-echo "  conda activate ${ENV_NAME}"
+echo "Activating the '${ENV_NAME}' environment..."
 echo ""
-echo "To deactivate, run:"
+print_status "Environment activated!"
+echo ""
+echo "To deactivate later, run:"
 echo "  conda deactivate"
 echo ""
 echo "To test TensorFlow with GPU:"
 echo "  python -c 'import tensorflow as tf; print(tf.config.list_physical_devices(\"GPU\"))'"
 echo ""
 print_status "All done! Happy coding! 🚀"
+echo ""
+
+# Activate the environment and start a new shell
+exec bash --init-file <(echo "source ~/.bashrc; conda activate ${ENV_NAME}; echo ''; echo 'Conda environment ${ENV_NAME} is now active!'; echo ''")
