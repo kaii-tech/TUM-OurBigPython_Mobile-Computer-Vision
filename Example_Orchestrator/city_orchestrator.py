@@ -20,13 +20,6 @@ from typing import List, Dict, Any
 # ---------------------------------------------------------------------------
 WORKER_IPS: List[str] = [
     "10.157.144.9",
-    "10.157.144.12",
-    "10.157.144.14",
-    "10.157.144.19",
-    "10.157.144.24",
-    "10.157.144.27",
-    "10.157.144.32",
-    "10.157.144.34",
 ]
 
 DEFAULT_SSH_USER = "go56pic"
@@ -35,15 +28,17 @@ DEFAULT_SSH_PORT = 22    # SSH port; override in secrets if non-standard
 MAX_WORKERS = int(os.environ.get("ACTIVE_WORKERS", len(WORKER_IPS)))
 SECRETS_PATH = Path(__file__).parent / ".orchestrator_secrets.json"  # user/password container
 
-PROJECT_DIR = "~/city_locator"  # Remote project dir containing train_city_distributed.py
-REMOTE_DATA_DIR = "~/city_locator/data"  # Directory with class subfolders on each worker
-REMOTE_OUTPUT_DIR = "~/city_locator/results"  # Where checkpoints/history are written on each worker
-ENV_ACTIVATE = "source ~/.bashrc && conda activate tf-m3"  # Change to your env
+PROJECT_DIR = "/home/go56pic/TUM-OurBigPython_Mobile-Computer-Vision"  # Remote project dir containing train_city_distributed.py
+REPO_URL = "https://github.com/kaii-tech/TUM-OurBigPython_Mobile-Computer-Vision.git"
+REPO_BRANCH = "Kaii"
+REMOTE_DATA_DIR = None  # If None, train_city_distributed.py will download via kagglehub
+REMOTE_OUTPUT_DIR = "~/TUM-OurBigPython_Mobile-Computer-Vision/results"  # Where checkpoints/history are written on each worker
+ENV_ACTIVATE = "source ~/miniconda3/etc/profile.d/conda.sh && conda activate tf-linux"  # Remote env on workers
 
-MODEL_NAME = "mobilenetv2"
-EPOCHS = 6
-BATCH_SIZE = 128  # Per worker
-IMG_SIZE = 224
+MODEL_NAME = "efficientnetb4"
+EPOCHS = 20
+BATCH_SIZE = 32  # Per worker (matches notebook)
+IMG_SIZE = 380
 
 LOCAL_RESULTS_DIR = Path("./orchestrator_results")
 LOCAL_RESULTS_DIR.mkdir(exist_ok=True)
@@ -69,7 +64,8 @@ def build_workers() -> List[Dict[str, Any]]:
     secrets = load_secrets(SECRETS_PATH)
     user = secrets.get("user", DEFAULT_SSH_USER)
     password = secrets.get("password")
-    tf_port = int(secrets.get("tf_port", secrets.get("port", DEFAULT_TF_PORT)))
+    # Do NOT reuse SSH port for TF; default to non-privileged port unless tf_port explicitly provided.
+    tf_port = int(secrets.get("tf_port", DEFAULT_TF_PORT))
     ssh_port = int(secrets.get("ssh_port", DEFAULT_SSH_PORT))
     selected_ips = WORKER_IPS[:MAX_WORKERS]
     workers = []
@@ -101,25 +97,29 @@ def build_tf_config(workers: List[Dict[str, Any]]) -> List[str]:
 
 def launch_worker(worker: Dict[str, Any], tf_config: str, log_path: Path):
     """Launch a single worker over SSH and stream output to log file."""
-    remote_cmd = (
-        f"cd {PROJECT_DIR} && "
-        f"{ENV_ACTIVATE} && "
-        f"TF_CONFIG='{tf_config}' PYTHONUNBUFFERED=1 "
-        f"python train_city_distributed.py "
-        f"--data-dir {REMOTE_DATA_DIR} "
-        f"--output-dir {REMOTE_OUTPUT_DIR} "
-        f"--epochs {EPOCHS} "
-        f"--batch-size {BATCH_SIZE} "
-        f"--img-size {IMG_SIZE} "
-        f"--model {MODEL_NAME}"
-    )
+    data_arg = f"--data-dir {REMOTE_DATA_DIR} " if REMOTE_DATA_DIR else ""
+    remote_cmd = "\n".join([
+        "set -e",
+        f"if [ ! -d {PROJECT_DIR}/.git ]; then",
+        f"  git clone --branch {REPO_BRANCH} {REPO_URL} {PROJECT_DIR}",
+        "else",
+        f"  cd {PROJECT_DIR}",
+        f"  git fetch origin {REPO_BRANCH}",
+        f"  git reset --hard origin/{REPO_BRANCH}",
+        "fi",
+        f"cd {PROJECT_DIR}",
+        f"{ENV_ACTIVATE}",
+        f"TF_CONFIG='{tf_config}' PYTHONUNBUFFERED=1 python Example_Orchestrator/train_city_distributed.py {data_arg}--output-dir {REMOTE_OUTPUT_DIR} --epochs {EPOCHS} --fine-tune-epochs 10 --batch-size {BATCH_SIZE} --img-size {IMG_SIZE}",
+    ])
+    # Quote the remote command so the login shell does not split on semicolons
+    remote_cmd_quoted = "'" + remote_cmd.replace("'", "'\"'\"'") + "'"
 
     log_file = log_path.open("w")
 
     ssh_cmd = ["ssh", *SSH_OPTS]
     if worker.get("ssh_port") and worker["ssh_port"] != 22:
         ssh_cmd += ["-p", str(worker["ssh_port"])]
-    ssh_cmd += [worker["host"], "bash", "-lc", remote_cmd]
+    ssh_cmd += [worker["host"], "bash", "-lc", remote_cmd_quoted]
     if worker.get("password"):
         ssh_cmd = ["sshpass", "-p", worker["password"]] + ssh_cmd
 
@@ -154,9 +154,10 @@ def monitor(processes):
 def fetch_from_chief(chief_worker: Dict[str, Any]):
     """Fetch artifacts from chief worker (index 0)."""
     files = [
-        f"{REMOTE_OUTPUT_DIR}/{MODEL_NAME}_history.json",
-        f"{REMOTE_OUTPUT_DIR}/{MODEL_NAME}_final.keras",
-        f"{REMOTE_OUTPUT_DIR}/{MODEL_NAME}_float16.tflite",
+        f"{REMOTE_OUTPUT_DIR}/efficientnetb4_stage1_history.json",
+        f"{REMOTE_OUTPUT_DIR}/efficientnetb4_stage2_history.json",
+        f"{REMOTE_OUTPUT_DIR}/efficientnetb4_final.keras",
+        f"{REMOTE_OUTPUT_DIR}/efficientnetb4_float16.tflite",
     ]
     for remote_file in files:
         local_path = LOCAL_RESULTS_DIR / Path(remote_file).name

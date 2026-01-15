@@ -4,6 +4,15 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "pip": true
+        "pip": true,
+        "/^python Example_Orchestrator/city_orchestrator\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "exit": true,
+        "/^python -V$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

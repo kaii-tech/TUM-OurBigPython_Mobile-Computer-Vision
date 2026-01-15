@@ -75,16 +75,20 @@ def load_datasets(data_root: Path, img_size: int, batch_size: int):
             validation_split=VALIDATION_SPLIT,
             subset=subset,
         )
+        class_names = getattr(ds, "class_names", None)
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = (
             tf.data.experimental.AutoShardPolicy.DATA
         )
-        return ds.with_options(options).prefetch(tf.data.AUTOTUNE)
+        ds = ds.with_options(options).prefetch(tf.data.AUTOTUNE)
+        return ds, class_names
 
-    train_ds = make_ds("training")
-    val_ds = make_ds("validation")
+    train_ds, train_classes = make_ds("training")
+    val_ds, _ = make_ds("validation")
 
-    num_classes = len(train_ds.class_names)
+    if not train_classes:
+        raise RuntimeError("Could not determine class names from training dataset")
+    num_classes = len(train_classes)
     print(f"Detected NUM_CLASSES = {num_classes}")
     return train_ds, val_ds, num_classes
 
