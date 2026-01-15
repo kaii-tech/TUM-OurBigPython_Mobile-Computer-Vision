@@ -89,11 +89,17 @@ initialize_conda() {
     print_status "Initializing conda..."
     "${INSTALL_PATH}/bin/conda" init bash
     
-    # Source conda
+    # Source conda for current session
     source "${INSTALL_PATH}/etc/profile.d/conda.sh"
     
-    print_status "Conda is now ready to use!"
-    print_warning "Note: You may need to restart your terminal after this script completes for conda to work in new sessions."
+    # Also try to source .bashrc if it exists
+    if [ -f "$HOME/.bashrc" ]; then
+        source "$HOME/.bashrc" 2>/dev/null || true
+    fi
+    
+    print_status "Miniconda installed successfully!"
+    print_warning "Note: Conda is now available in this script session."
+    print_warning "For new terminal sessions, restart your terminal or run: source ~/.bashrc"
     echo ""
     
     return 0
