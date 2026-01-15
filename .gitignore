@@ -254,3 +254,4 @@ desktop.ini
 .DS_Store
 .Trashes
 
+.orchestrator_secrets.json
