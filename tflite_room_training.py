@@ -15,6 +15,7 @@ from PIL import Image
 from collections import defaultdict
 from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
+import kagglehub
 
 # Configure TensorFlow to use GPU in WSL
 print("=" * 60)
@@ -78,6 +79,10 @@ def load_and_preprocess_data():
     print("\n" + "-" * 50)
     print("Loading Lab Course Dataset...")
     print("-" * 50)
+    
+    # Download latest version
+    path = kagglehub.dataset_download("amaralibey/gsv-cities")
+    print("Path to dataset files:", path)
     
     id_to_room, index_data = load_room_labels()
     print(f"Found {len(id_to_room)} room classes")
