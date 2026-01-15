@@ -89,20 +89,12 @@ initialize_conda() {
     print_status "Initializing conda..."
     "${INSTALL_PATH}/bin/conda" init bash
     
-    # Source conda for current session
-    source "${INSTALL_PATH}/etc/profile.d/conda.sh"
-    
-    # Also try to source .bashrc if it exists
-    if [ -f "$HOME/.bashrc" ]; then
-        source "$HOME/.bashrc" 2>/dev/null || true
-    fi
-    
     print_status "Miniconda installed successfully!"
-    print_warning "Note: Conda is now available in this script session."
-    print_warning "For new terminal sessions, restart your terminal or run: source ~/.bashrc"
+    print_status "Restarting script in new bash session with conda available..."
     echo ""
     
-    return 0
+    # Restart the script in a new bash session with conda initialized
+    exec bash "$0" "$@"
 }
 
 # Initialize conda first
@@ -306,13 +298,18 @@ echo "Setup Complete!"
 echo "=========================================="
 print_status "Conda environment '${ENV_NAME}' is ready!"
 echo ""
-echo "To activate the environment, run:"
-echo "  conda activate ${ENV_NAME}"
+echo "Activating the '${ENV_NAME}' environment..."
 echo ""
-echo "To deactivate, run:"
+print_status "Environment activated!"
+echo ""
+echo "To deactivate later, run:"
 echo "  conda deactivate"
 echo ""
 echo "To test TensorFlow with GPU:"
 echo "  python -c 'import tensorflow as tf; print(tf.config.list_physical_devices(\"GPU\"))'"
 echo ""
 print_status "All done! Happy coding! 🚀"
+echo ""
+
+# Activate the environment and start a new shell
+exec bash --init-file <(echo "source ~/.bashrc; conda activate ${ENV_NAME}; echo ''; echo 'Conda environment ${ENV_NAME} is now active!'; echo ''")
