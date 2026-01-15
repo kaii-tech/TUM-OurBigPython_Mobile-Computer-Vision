@@ -29,6 +29,55 @@ print_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
+# Initialize conda
+initialize_conda() {
+    # Check if conda is already available
+    if command -v conda &> /dev/null; then
+        return 0
+    fi
+    
+    # Try to find and source conda from common locations
+    POSSIBLE_CONDA_PATHS=(
+        "$HOME/miniconda3"
+        "$HOME/anaconda3"
+        "$HOME/miniforge3"
+        "$HOME/mambaforge"
+        "/opt/conda"
+        "/opt/miniconda3"
+        "/opt/anaconda3"
+        "/usr/local/miniconda3"
+        "/usr/local/anaconda3"
+    )
+    
+    for conda_path in "${POSSIBLE_CONDA_PATHS[@]}"; do
+        if [ -f "${conda_path}/etc/profile.d/conda.sh" ]; then
+            print_status "Found conda at: ${conda_path}"
+            source "${conda_path}/etc/profile.d/conda.sh"
+            return 0
+        fi
+    done
+    
+    # If still not found, show error and instructions
+    print_error "Conda not found!"
+    echo ""
+    echo "Please install Miniconda or Anaconda first:"
+    echo ""
+    echo "To install Miniconda:"
+    echo "  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+    echo "  bash Miniconda3-latest-Linux-x86_64.sh"
+    echo ""
+    echo "Or follow instructions at: https://docs.conda.io/en/latest/miniconda.html"
+    echo ""
+    echo "After installation, restart your terminal or run:"
+    echo "  source ~/miniconda3/etc/profile.d/conda.sh"
+    echo ""
+    exit 1
+}
+
+# Initialize conda first
+print_status "Checking for conda installation..."
+initialize_conda
+
 # 1. Update Conda
 echo ""
 echo "=========================================="
@@ -38,44 +87,24 @@ print_status "Updating conda to the latest version..."
 conda update -n base -c defaults conda -y
 print_status "Conda updated successfully!"
 
-# 2. Update CUDA drivers (requires sudo)
+# 2. Check CUDA drivers (no sudo - info only)
 echo ""
 echo "=========================================="
 echo "Step 2: Checking CUDA Drivers"
 echo "=========================================="
-print_warning "CUDA driver updates require sudo privileges."
-print_warning "Current NVIDIA driver version:"
 
 if command -v nvidia-smi &> /dev/null; then
-    nvidia-smi --query-gpu=driver_version --format=csv,noheader
-    print_status "NVIDIA driver detected!"
-    
-    read -p "Do you want to update NVIDIA/CUDA drivers? (y/n): " update_drivers
-    if [[ "$update_drivers" == "y" || "$update_drivers" == "Y" ]]; then
-        print_status "Updating NVIDIA CUDA drivers..."
-        # Add NVIDIA package repositories
-        sudo apt-get update
-        sudo apt-get install -y software-properties-common
-        
-        # Install/Update NVIDIA drivers and CUDA toolkit
-        print_status "Installing NVIDIA drivers and CUDA toolkit..."
-        sudo apt-get install -y nvidia-driver-535 nvidia-cuda-toolkit
-        
-        print_warning "NVIDIA driver update complete. A reboot may be required."
-        print_warning "Run 'sudo reboot' after this script completes if needed."
-    else
-        print_status "Skipping NVIDIA driver update."
-    fi
+    NVIDIA_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n 1)
+    print_status "NVIDIA driver detected: ${NVIDIA_VERSION}"
+    nvidia-smi --query-gpu=name --format=csv,noheader | while read -r gpu; do
+        print_status "GPU found: ${gpu}"
+    done
 else
-    print_warning "NVIDIA driver not found. Please install NVIDIA drivers manually:"
-    echo "   sudo apt-get update"
-    echo "   sudo apt-get install -y nvidia-driver-535 nvidia-cuda-toolkit"
+    print_warning "NVIDIA driver not found - TensorFlow will run on CPU only"
     echo ""
-    read -p "Continue anyway? (y/n): " continue_anyway
-    if [[ "$continue_anyway" != "y" && "$continue_anyway" != "Y" ]]; then
-        print_error "Exiting script."
-        exit 1
-    fi
+    echo "  To install NVIDIA drivers (requires sudo), run:"
+    echo "    sudo apt-get update && sudo apt-get install -y nvidia-driver-535 nvidia-cuda-toolkit"
+    echo ""
 fi
 
 # 3. Create conda environment

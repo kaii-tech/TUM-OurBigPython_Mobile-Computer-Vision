@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^source \\$HOME/miniconda3/etc/profile\\.d/conda\\.sh && cd /home/go56pic/projects/TUM-OurBigPython_Mobile-Computer-Vision && \\./setup_tf_linux\\.sh$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
