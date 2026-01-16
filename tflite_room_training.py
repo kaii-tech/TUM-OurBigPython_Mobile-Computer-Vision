@@ -5,9 +5,15 @@ This script trains a CNN model on the Lab Course Dataset and converts it to TFLi
 Run via WSL for GPU acceleration: .\run_wsl.ps1 "tflite_room_training.py"
 """
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress all TensorFlow logging
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_AUTOGRAPH_VERBOSITY'] = '0'
+import logging
+logging.getLogger('tensorflow').setLevel(logging.CRITICAL)
+
 import tensorflow as tf
 import numpy as np
-import os
 import time
 import json
 from pathlib import Path
@@ -15,6 +21,11 @@ from PIL import Image
 from collections import defaultdict
 from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Configure TensorFlow to use GPU in WSL
 print("=" * 60)
@@ -73,8 +84,19 @@ def load_room_labels():
     return id_to_room, index_data
 
 
+def load_single_image(img_path, label, img_size):
+    """Load and preprocess a single image (thread-safe)."""
+    try:
+        img = Image.open(img_path).convert('RGB')
+        img = img.resize((img_size, img_size))
+        img_array = np.array(img, dtype=np.float32) / 255.0
+        return img_array, label, None
+    except Exception as e:
+        return None, None, f"Error loading {img_path}: {e}"
+
+
 def load_and_preprocess_data():
-    """Load and preprocess Lab Course Dataset."""
+    """Load and preprocess Lab Course Dataset with parallel image loading."""
     print("\n" + "-" * 50)
     print("Loading Lab Course Dataset...")
     print("-" * 50)
@@ -89,10 +111,10 @@ def load_and_preprocess_data():
     
     print(f"Room classes: {room_names}")
     
-    images = []
-    labels = []
+    # Collect all image paths and labels first
+    image_tasks = []
+    room_counts = defaultdict(int)
     
-    # Load images from each folder
     for room_id in range(1, 28):  # 1 to 27
         folder_path = dataset_path / str(room_id)
         if not folder_path.exists():
@@ -102,22 +124,65 @@ def load_and_preprocess_data():
         room_name = id_to_room[room_id]
         label = room_to_label[room_name]
         
-        # Count images in this folder
+        # Collect image files
         image_files = list(folder_path.glob('*.[jJ][pP][gG]')) + \
                       list(folder_path.glob('*.[jJ][pP][eE][gG]')) + \
                       list(folder_path.glob('*.[pP][nN][gG]'))
         
         for img_path in image_files:
-            try:
-                img = Image.open(img_path).convert('RGB')
-                img = img.resize((IMG_SIZE, IMG_SIZE))
-                img_array = np.array(img, dtype=np.float32) / 255.0
+            image_tasks.append((img_path, label, room_id, room_name))
+        
+        room_counts[room_id] = (len(image_files), room_name)
+    
+    total_images = len(image_tasks)
+    print(f"\nTotal images to load: {total_images}")
+    print("Loading images in parallel...")
+    
+    # Parallel image loading
+    images = []
+    labels = []
+    errors = []
+    
+    num_workers = min(32, (os.cpu_count() or 4) * 4)  # Optimal for I/O-bound tasks
+    start_time = time.time()
+    completed = 0
+    lock = threading.Lock()
+    
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        future_to_task = {
+            executor.submit(load_single_image, img_path, label, IMG_SIZE): (img_path, room_id, room_name)
+            for img_path, label, room_id, room_name in image_tasks
+        }
+        
+        for future in as_completed(future_to_task):
+            img_array, label, error = future.result()
+            
+            with lock:
+                completed += 1
+                if completed % 500 == 0 or completed == total_images:
+                    elapsed = time.time() - start_time
+                    rate = completed / elapsed if elapsed > 0 else 0
+                    print(f"  Loaded {completed}/{total_images} images ({rate:.1f} img/s)")
+            
+            if error:
+                errors.append(error)
+            elif img_array is not None:
                 images.append(img_array)
                 labels.append(label)
-            except Exception as e:
-                print(f"Error loading {img_path}: {e}")
-        
-        print(f"  Room {room_id} ({room_name}): {len(image_files)} images")
+    
+    elapsed_time = time.time() - start_time
+    print(f"\nLoaded {len(images)} images in {elapsed_time:.2f}s ({len(images)/elapsed_time:.1f} img/s)")
+    
+    # Print room statistics
+    print("\nImages per room:")
+    for room_id in sorted(room_counts.keys()):
+        count, room_name = room_counts[room_id]
+        print(f"  Room {room_id} ({room_name}): {count} images")
+    
+    if errors:
+        print(f"\n{len(errors)} errors occurred during loading")
+        for err in errors[:5]:
+            print(f"  {err}")
     
     images = np.array(images)
     labels = np.array(labels)
@@ -137,7 +202,7 @@ def load_and_preprocess_data():
     return (x_train, y_train), (x_test, y_test), label_to_room
 
 
-def create_mobilenet_model():
+def create_mobilenet_model(num_classes):
     """Create a MobileNetV2 transfer learning model for room classification."""
     input_shape = (IMG_SIZE, IMG_SIZE, 3)
     
@@ -172,7 +237,7 @@ def create_mobilenet_model():
     x = layers.GlobalAveragePooling2D()(x)
     x = layers.Dense(256, activation='relu')(x)
     x = layers.Dropout(0.4)(x)
-    outputs = layers.Dense(NUM_CLASSES, activation='softmax')(x)
+    outputs = layers.Dense(num_classes, activation='softmax')(x)
     
     model = tf.keras.Model(inputs, outputs)
     
@@ -221,11 +286,15 @@ def main():
     
     print(f"\nLabel mapping: {label_to_room}")
     
+    # Get actual number of classes
+    num_classes = len(label_to_room)
+    print(f"Number of classes: {num_classes}")
+    
     # Create model with MobileNetV2 base
     print("\n" + "-" * 50)
     print("Creating MobileNetV2 Model...")
     print("-" * 50)
-    model, base_model = create_mobilenet_model()
+    model, base_model = create_mobilenet_model(num_classes)
     
     # ========== STAGE 1: Train classification head only ==========
     print("\n" + "=" * 60)
@@ -341,6 +410,80 @@ def main():
     compression = keras_size / tflite_size
     print(f"Original Keras: {keras_size:.2f} MB")
     print(f"TFLite Float16: {tflite_size:.2f} MB (compression: {compression:.2f}x)")
+    
+    # ========== TEST TFLITE MODEL ==========
+    print("\n" + "=" * 60)
+    print("TESTING TFLITE MODEL ON TEST SET")
+    print("=" * 60)
+    
+    # Load TFLite model
+    interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+    interpreter.allocate_tensors()
+    
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    
+    print(f"Input shape: {input_details[0]['shape']}")
+    print(f"Input dtype: {input_details[0]['dtype']}")
+    
+    # Run inference on test set
+    tflite_predictions = []
+    start_time = time.time()
+    
+    for i in range(len(x_test)):
+        input_data = np.expand_dims(x_test[i], axis=0).astype(np.float32)
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])
+        tflite_predictions.append(np.argmax(output_data))
+        
+        if (i + 1) % 500 == 0:
+            print(f"  Processed {i + 1}/{len(x_test)} images...")
+    
+    tflite_time = time.time() - start_time
+    tflite_predictions = np.array(tflite_predictions)
+    
+    # Calculate TFLite accuracy
+    tflite_accuracy = np.mean(tflite_predictions == y_test)
+    print(f"\nTFLite Model Results:")
+    print(f"  Accuracy: {tflite_accuracy:.4f} ({tflite_accuracy*100:.2f}%)")
+    print(f"  Inference time: {tflite_time:.2f}s ({len(x_test)/tflite_time:.1f} img/s)")
+    print(f"  Accuracy difference from Keras: {(tflite_accuracy - test_accuracy)*100:+.2f}%")
+    
+    # ========== CONFUSION MATRIX & PER-ROOM ACCURACY ==========
+    print("\n" + "=" * 60)
+    print("CONFUSION MATRIX & PER-ROOM ACCURACY (TFLite Model)")
+    print("=" * 60)
+    
+    # Confusion matrix from TFLite predictions
+    num_classes_actual = len(label_to_room)
+    cm = confusion_matrix(y_test, tflite_predictions)
+    
+    # Plot confusion matrix
+    plt.figure(figsize=(14, 12))
+    room_labels = [label_to_room[i] for i in range(num_classes_actual)]
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=room_labels, yticklabels=room_labels)
+    plt.title('Confusion Matrix - Room Classification (TFLite Model)')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    cm_path = script_dir / 'confusion_matrix.png'
+    plt.savefig(cm_path, dpi=150)
+    print(f"Confusion matrix saved to: {cm_path}")
+    plt.close()
+    
+    # Per-room accuracy
+    print("\nTFLite Per-Room Accuracy:")
+    print("-" * 40)
+    for i in range(num_classes_actual):
+        room_name = label_to_room[i]
+        room_total = np.sum(y_test == i)
+        room_correct = cm[i, i]
+        room_acc = (room_correct / room_total * 100) if room_total > 0 else 0
+        print(f"  {room_name:20s}: {room_acc:6.2f}% ({room_correct}/{room_total})")
     
     print("\n" + "=" * 60)
     print("Training completed!")
