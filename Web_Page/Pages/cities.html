@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- VIEWPORT META TAG FOR MOBILE RESPONSIVENESS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Cities</title>
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link rel="stylesheet" href="../assets/css/cities.css">
+</head>
+<body>
+
+    <!-- Header Include -->
+    <div id="header-placeholder"></div>
+
+    <!-- Page Title -->
+    <h1 class="page-title">Your Cities</h1>
+
+    <!-- Carousel Container -->
+    <div id="carousel-container">
+        <h2 id="carousel-title"></h2>
+        <div class="carousel-wrapper">
+            <div class="carousel-track">
+                <div class="carousel-item prev"></div>
+                <div class="carousel-item current"></div>
+                <div class="carousel-item next"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container for all city boxes -->
+    <div id="cities-container"></div>
+
+    <!-- Main JS -->
+    <script src="../assets/js/main.js"></script>
+
+    <script>
+        // Include the header
+        fetch('Classes/header.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('header-placeholder').innerHTML = data;
+            });
+
+        // Load city data from JSON
+        fetch('../assets/json/cities.json')
+            .then(response => response.json())
+            .then(cities => {
+
+                // --- Randomize city order ---
+                cities.sort(() => Math.random() - 0.5);
+
+                let currentIndex = 0;
+
+                const title = document.getElementById('carousel-title');
+                const prevItem = document.querySelector('.carousel-item.prev');
+                const currentItem = document.querySelector('.carousel-item.current');
+                const nextItem = document.querySelector('.carousel-item.next');
+
+                function renderCarousel() {
+                    const prevIndex = (currentIndex - 1 + cities.length) % cities.length;
+                    const nextIndex = (currentIndex + 1) % cities.length;
+
+                    const prevCity = cities[prevIndex];
+                    const currentCity = cities[currentIndex];
+                    const nextCity = cities[nextIndex];
+
+                    title.textContent = currentCity.name;
+
+                    prevItem.innerHTML = `<img src="../assets/cities/${prevCity.images[0]}" alt="${prevCity.name}">`;
+                    currentItem.innerHTML = `<img src="../assets/cities/${currentCity.images[0]}" alt="${currentCity.name}">`;
+                    nextItem.innerHTML = `<img src="../assets/cities/${nextCity.images[0]}" alt="${nextCity.name}">`;
+                }
+
+                renderCarousel();
+
+                // Rotate every 5 seconds
+                setInterval(() => {
+                    currentIndex = (currentIndex + 1) % cities.length;
+                    renderCarousel();
+                }, 5000);
+
+                // --- Boxes Setup ---
+                const container = document.getElementById('cities-container');
+
+                cities.forEach(city => {
+                    const box = document.createElement('div');
+                    box.className = 'city-box';
+
+                    const header = document.createElement('div');
+                    header.className = 'city-header';
+                    header.innerHTML = `<span>${city.name}</span> <span class="toggle-icon">▼</span>`;
+
+                    const content = document.createElement('div');
+                    content.className = 'city-content';
+                    content.innerHTML = `
+                        <img src="../assets/cities/${city.images[0]}" alt="${city.name}">
+                        <p>${city.description}</p>
+                    `;
+
+                    header.addEventListener('click', () => {
+                        const isVisible = content.style.display === 'block';
+                        content.style.display = isVisible ? 'none' : 'block';
+                    });
+
+                    box.appendChild(header);
+                    box.appendChild(content);
+                    container.appendChild(box);
+                });
+
+            })
+            .catch(err => console.error("Failed to load cities.json:", err));
+    </script>
+
+</body>
+</html>

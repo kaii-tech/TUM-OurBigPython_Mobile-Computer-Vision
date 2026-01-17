@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Find – Where Am I</title>
+
+<!-- Viewport for mobile -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="../assets/css/main.css">
+<link rel="stylesheet" href="../assets/css/find.css">
+</head>
+<body>
+
+<!-- Header Include -->
+<div id="header-placeholder"></div>
+
+<div class="page-content find-page">
+    <h1 class="page-title find-page__title">Where am I?</h1>
+
+    <div class="camera-container find-page__camera">
+        <video class="find-page__video" id="video" autoplay playsinline></video>
+        <img class="find-page__photo" id="photo" hidden>
+        <canvas class="find-page__canvas" id="canvas" hidden></canvas>
+        <div class="find-page__info" id="photo-info"></div>
+
+        <button class="find-page__button" id="camera-btn">Start Camera / Take Photo</button>
+        <button class="find-page__switch" id="switch-btn" hidden>Switch Camera</button>
+    </div>
+</div>
+
+<script>
+fetch('Classes/header.html')
+.then(res => res.text())
+.then(html => document.getElementById('header-placeholder').innerHTML = html);
+
+const video = document.getElementById('video');
+const photo = document.getElementById('photo');
+const canvas = document.getElementById('canvas');
+const button = document.getElementById('camera-btn');
+const switchBtn = document.getElementById('switch-btn');
+const info = document.getElementById('photo-info');
+
+let stream = null;
+let captured = false;
+let usingFrontCamera = false;
+
+// Detect mobile (iPhone included)
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+if(isMobile) switchBtn.hidden = false;
+
+// Start camera
+async function startCamera() {
+    if (stream) stopCamera();
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: usingFrontCamera ? "user" : "environment" },
+            audio: false
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        alert("Camera access denied or unavailable.");
+        console.error(err);
+    }
+}
+
+function stopCamera() {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+}
+
+// Take photo
+function takePicture() {
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+
+    const dataURL = canvas.toDataURL('image/jpeg');
+    photo.src = dataURL;
+    photo.hidden = false;
+    video.hidden = true;
+
+    stopCamera();
+
+    const sizeKB = Math.round((dataURL.length * 3) / 4 / 1024);
+    const time = new Date().toLocaleString();
+    const name = `photo_${Date.now()}.jpg`;
+
+    info.innerHTML = `
+        <strong>Captured image</strong><br>
+        Name: ${name}<br>
+        Size: ${sizeKB} KB<br>
+        Time: ${time}
+    `;
+
+    button.textContent = "Retake";
+    captured = true;
+}
+
+// Retake
+function retake() {
+    info.innerHTML = "";
+    photo.hidden = true;
+    video.hidden = false;
+    button.textContent = "Take Photo";
+    captured = false;
+    startCamera();
+}
+
+// Button click
+button.addEventListener('click', () => {
+    if (!captured) {
+        if(!stream) startCamera();
+        else takePicture();
+    } else {
+        retake();
+    }
+});
+
+// Switch camera
+switchBtn.addEventListener('click', () => {
+    usingFrontCamera = !usingFrontCamera;
+    startCamera();
+});
+</script>
+
+</body>
+</html>

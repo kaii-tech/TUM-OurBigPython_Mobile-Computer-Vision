@@ -1,0 +1,117 @@
+[
+    {
+        "name": "Bangkok",
+        "description": "Bangkok, Thailand’s bustling capital, sits on the Chao Phraya River and is home to over 10 million people. The city is famous for its ornate temples, such as Wat Arun and the Grand Palace. Street food and vibrant markets fill every corner, offering an endless culinary adventure. Modern skyscrapers rise alongside traditional wooden houses, reflecting a unique blend of old and new. Despite traffic and crowds, Bangkok’s energy and culture attract millions of visitors each year.",
+        "images": ["Bangkok.jpg"]
+    },
+    {
+        "name": "Barcelona",
+        "description": "Barcelona, on Spain’s Mediterranean coast, is renowned for the whimsical architecture of Antoni Gaudí, including the Sagrada Familia and Park Güell. The city blends medieval streets with modern avenues, lively plazas, and bustling markets. Beautiful beaches and vibrant nightlife make it a favorite for tourists. Catalan culture and cuisine add unique flavor to daily life, from tapas bars to traditional festivals. Art, music, and street performances fill the streets with energy throughout the year.",
+        "images": ["Barcelona.jpg"]
+    },
+    {
+        "name": "Boston",
+        "description": "Boston, Massachusetts, is a historic city known for the Freedom Trail and colonial architecture. Prestigious universities, including Harvard and MIT nearby, create a youthful, intellectual atmosphere. Sports culture is strong, with passionate fans for the Red Sox and Celtics. The Charles River and Boston Harbor provide scenic outdoor spaces. Rich history meets modern innovation, making Boston a vibrant and dynamic city.",
+        "images": ["Boston.jpg"]
+    },
+    {
+        "name": "Brussels",
+        "description": "Brussels, Belgium’s capital, is famous for chocolate, waffles, and beer. Its medieval Grand Place is a UNESCO World Heritage site with stunning architecture. The city hosts many EU institutions, giving it international importance. Comic culture is also visible with Tintin murals and museums. Mix of historic charm and modern European life makes Brussels unique.",
+        "images": ["Brussels.jpg"]
+    },
+    {
+        "name": "BuenosAires",
+        "description": "Buenos Aires, Argentina’s vibrant capital, is known as the birthplace of tango. Colorful neighborhoods like La Boca offer lively streets and local art. European-style architecture contrasts with Latin American culture, creating a distinctive urban landscape. The city is also famous for delicious steak and dynamic nightlife. Parks, cafes, and cultural festivals make it lively at all hours.",
+        "images": ["BuenosAires.jpg"]
+    },
+    {
+        "name": "Chicago",
+        "description": "Chicago, on the shores of Lake Michigan, is famed for its skyline and architecture, including Willis Tower. The city boasts world-class museums, blues and jazz music, and deep-dish pizza. Millennium Park and Navy Pier offer cultural and recreational activities. Sports are an integral part of the city’s identity, with passionate fans for the Cubs and Bulls. Chicago combines history, culture, and a vibrant city life.",
+        "images": ["Chicago.jpg"]
+    },
+    {
+        "name": "Lisbon",
+        "description": "Lisbon, Portugal’s hilly capital, is known for its colorful streets, historic trams, and panoramic viewpoints. The Tagus River enhances the city’s scenic charm. Fado music and local cuisine create a deep cultural experience. Old neighborhoods like Alfama blend tradition with modern city life. The sunny climate and relaxed atmosphere make Lisbon a favorite destination.",
+        "images": ["Lisbon.jpg"]
+    },
+    {
+        "name": "London",
+        "description": "London, England’s capital, is a global hub for culture, finance, and history. Landmarks include the Tower of London, Big Ben, and Buckingham Palace. Museums like the British Museum and Tate Modern attract millions of visitors. Parks and the River Thames offer green and scenic spaces amidst urban life. A cosmopolitan city with centuries of history, London blends tradition with modernity.",
+        "images": ["London.jpg"]
+    },
+    {
+        "name": "LosAngeles",
+        "description": "Los Angeles, California, is known as the entertainment capital of the world. Hollywood, beaches, and sprawling suburbs define its landscape. Diverse cultures and cuisines reflect its multicultural population. Landmarks like the Hollywood Sign and Griffith Observatory attract visitors. Vibrant arts, music, and film industries make LA a creative hub.",
+        "images": ["LosAngeles.jpg"]
+    },
+    {
+        "name": "Madrid",
+        "description": "Madrid, Spain’s capital, features grand boulevards, lively plazas, and world-class museums like the Prado. The Royal Palace and historic neighborhoods highlight its rich past. Tapas bars and nightlife make the city lively at night. Parks like Retiro Park provide green spaces for relaxation. Madrid combines traditional Spanish culture with modern urban life.",
+        "images": ["Madrid.jpg"]
+    },
+    {
+        "name": "Medellin",
+        "description": "Medellin, Colombia, is nestled in the Aburrá Valley and known as the City of Eternal Spring due to its pleasant climate. It has transformed from its troubled past into a vibrant cultural hub. Innovative public transport and cable cars connect neighborhoods across hills. Festivals and art, including outdoor sculptures, enrich daily life. Medellin blends modern urban living with scenic mountain views.",
+        "images": ["Medellin.jpg"]
+    },
+    {
+        "name": "Melbourne",
+        "description": "Melbourne, Australia’s cultural capital, is renowned for its arts scene, cafes, and street art. The city hosts numerous festivals and sporting events year-round. Historic architecture contrasts with modern skyscrapers, giving a unique cityscape. Its multicultural population contributes to diverse culinary and cultural experiences. Parks and the Yarra River provide outdoor recreational areas.",
+        "images": ["Melbourne.jpg"]
+    },
+    {
+        "name": "MexicoCity",
+        "description": "Mexico City, the capital of Mexico, sits at a high altitude with a rich history dating back to the Aztecs. The historic center features colonial architecture and vibrant public squares. Museums, markets, and street art offer a dynamic cultural experience. Cuisine ranges from street tacos to gourmet restaurants. Modern skyscrapers sit alongside ancient ruins, blending past and present.",
+        "images": ["MexicoCity.jpg"]
+    },
+    {
+        "name": "Miami",
+        "description": "Miami, Florida, is famous for its sandy beaches, Art Deco architecture, and vibrant nightlife. Its multicultural population, especially Latin American, influences cuisine and culture. The city hosts numerous festivals and events, including music and arts. Outdoor activities include boating, sports, and waterfront recreation. Miami blends modern city life with tropical scenery.",
+        "images": ["Miami.jpg"]
+    },
+    {
+        "name": "Minneapolis",
+        "description": "Minneapolis, part of the Twin Cities in Minnesota, is known for its lakes, parks, and the Mississippi River. Cultural attractions include theaters, museums, and music venues. The city supports outdoor activities like biking, skiing, and kayaking. Historic architecture sits alongside modern developments. Minneapolis combines urban amenities with access to nature.",
+        "images": ["Minneapolis.jpg"]
+    },
+    {
+        "name": "Oslo",
+        "description": "Oslo, Norway’s capital, is set between the Oslofjord and forested hills. The city is famous for Viking history, museums, and modern architecture. Cultural events, music, and art exhibitions are abundant. Outdoor recreation, including hiking and boating, is easily accessible. Oslo blends natural beauty with urban living.",
+        "images": ["Oslo.jpg"]
+    },
+    {
+        "name": "Osaka",
+        "description": "Osaka, a major city in Japan, is known for its modern architecture, nightlife, and street food culture. Landmarks include Osaka Castle and the bustling Dotonbori district. The city is an economic hub with a strong industrial and commercial base. Festivals and local cuisine make it vibrant and lively. It combines tradition with modern city life.",
+        "images": ["Osaka.jpg"]
+    },
+    {
+        "name": "Prague",
+        "description": "Prague, the capital of the Czech Republic, is famous for its medieval old town, Gothic cathedrals, and the iconic Charles Bridge. The city’s architecture spans centuries, offering a mix of styles. Cultural life is rich with theaters, music, and festivals. Cafes and cobbled streets attract locals and tourists alike. The Vltava River adds scenic beauty to the cityscape.",
+        "images": ["Prague.jpg"]
+    },
+    {
+        "name": "Paris",
+        "description": "Paris, the capital of France, is celebrated for the Eiffel Tower, Louvre Museum, and romantic boulevards. The city is known for art, fashion, and gourmet cuisine. Historic neighborhoods like Montmartre and the Marais offer charm and culture. Cafes, bakeries, and street life make the city lively day and night. Paris blends history, style, and modern urban life seamlessly.",
+        "images": ["Paris.jpg"]
+    },
+    {
+        "name": "Phoenix",
+        "description": "Phoenix, Arizona, is set in the Sonoran Desert and is known for its hot climate and sprawling suburbs. Golf courses, hiking trails, and desert parks attract outdoor enthusiasts. The city has a growing arts scene with museums and theaters. Southwestern architecture and culture are prominent. Phoenix blends urban development with the beauty of desert landscapes.",
+        "images": ["Phoenix.jpg"]
+    },
+    {
+        "name": "Rome",
+        "description": "Rome, Italy’s historic capital, is home to ancient ruins like the Colosseum and Roman Forum. Vatican City, with St. Peter’s Basilica and the Sistine Chapel, is within its boundaries. Piazzas, fountains, and cobblestone streets fill the city with charm. Italian cuisine, art, and music enrich daily life. Rome’s combination of history, culture, and vibrant street life is unmatched.",
+        "images": ["Rome.jpg"]
+    },
+    {
+        "name": "Toronto",
+        "description": "Toronto, Canada’s largest city, is a multicultural metropolis with towering skyscrapers and a bustling waterfront. Landmarks include the CN Tower, Royal Ontario Museum, and historic Distillery District. Festivals, theaters, and music events make the city lively. Diverse neighborhoods reflect global cultures and cuisines. Toronto blends modern urban living with rich cultural experiences.",
+        "images": ["Toronto.jpg"]
+    },
+    {
+        "name": "WashingtonDC",
+        "description": "Washington DC, the capital of the United States, is known for its national monuments, museums, and government buildings. Landmarks include the White House, Capitol, and Lincoln Memorial. The city hosts numerous cultural events, art exhibitions, and music festivals. Beautiful parks and the National Mall provide green spaces. Washington DC combines history, politics, and culture in a unique urban setting.",
+        "images": ["WashingtonDC.jpg"]
+    }
+]

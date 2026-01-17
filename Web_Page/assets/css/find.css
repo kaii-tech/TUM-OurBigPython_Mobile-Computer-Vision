@@ -1,0 +1,101 @@
+/* Scoped Find Page */
+.find-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    background: #f4f6f8;
+}
+
+.find-page__title {
+    margin-top: 30px;
+    color: #007BFF;
+    text-align: center;
+}
+
+.find-page__camera {
+    margin-top: 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    padding: 16px;
+    width: fit-content;
+    max-width: 80vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.find-page__video,
+.find-page__photo {
+    width: 80vw;
+    max-width: 640px;
+    height: auto;
+    aspect-ratio: 16/9;
+    border-radius: 10px;
+    background: black;
+}
+
+.find-page__button,
+.find-page__switch {
+    margin-top: 15px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.find-page__button:hover,
+.find-page__switch:hover {
+    background-color: #0056b3;
+}
+
+.find-page__info {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #333;
+    text-align: center;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .find-page__camera {
+        width: 90vw;
+        padding: 12px;
+    }
+    .find-page__video,
+    .find-page__photo {
+        width: 90vw;
+    }
+    .find-page__button,
+    .find-page__switch {
+        font-size: 1.1rem;
+        padding: 14px 28px;
+    }
+    .find-page__info {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .find-page__camera {
+        width: 95vw;
+        padding: 10px;
+    }
+    .find-page__video,
+    .find-page__photo {
+        width: 95vw;
+    }
+    .find-page__button,
+    .find-page__switch {
+        font-size: 1rem;
+        padding: 12px 20px;
+    }
+    .find-page__info {
+        font-size: 0.8rem;
+    }
+}
