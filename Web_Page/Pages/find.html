@@ -59,6 +59,11 @@ async function startCamera() {
             audio: false
         });
         video.srcObject = stream;
+
+        // Wait for video metadata to load to get actual dimensions
+        video.onloadedmetadata = () => {
+            resizeVideoToStream();
+        };
     } catch (err) {
         alert("Camera access denied or unavailable.");
         console.error(err);
@@ -69,12 +74,34 @@ function stopCamera() {
     if (stream) stream.getTracks().forEach(track => track.stop());
 }
 
+// Resize video to match camera stream but fit container
+function resizeVideoToStream() {
+    const container = video.parentElement;
+    const maxWidth = container.clientWidth;
+    const maxHeight = container.clientHeight || window.innerHeight * 0.6; // fallback
+
+    const videoRatio = video.videoWidth / video.videoHeight;
+    const containerRatio = maxWidth / maxHeight;
+
+    let width, height;
+    if(videoRatio > containerRatio) {
+        width = maxWidth;
+        height = maxWidth / videoRatio;
+    } else {
+        height = maxHeight;
+        width = maxHeight * videoRatio;
+    }
+
+    video.style.width = width + 'px';
+    video.style.height = height + 'px';
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+}
+
 // Take photo
 function takePicture() {
     const ctx = canvas.getContext('2d');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataURL = canvas.toDataURL('image/jpeg');
     photo.src = dataURL;
